@@ -98,10 +98,10 @@ export default function Index() {
         </p>
       </div>
 
-      <div className="absolute bottom-4 right-6 text-sm text-right text-gray-500">
+      {/* <div className="absolute bottom-4 right-6 text-sm text-right text-gray-500">
         <div>✅ 94%</div>
         <div>⏱ 2.3min</div>
-      </div>
+      </div> */}
     </div>
   );
 }

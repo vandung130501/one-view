@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import SearchConsole from "~/components/SearchConsole";
 
 export default function AiSearch() {
@@ -8,6 +7,7 @@ export default function AiSearch() {
             <h1 className="text-xl font-bold">
                 AI Search
             </h1>
+            <br />
             <SearchConsole />
         </div>);
 }

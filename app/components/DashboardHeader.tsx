@@ -1,6 +1,13 @@
-export default function DashboardHeader() {
+interface DashboardHeaderProps {
+    timeframe: string;
+    setTimeframe: (value: string) => void;
+  }
+  
+  export default function DashboardHeader({ timeframe, setTimeframe }: DashboardHeaderProps) {
+    const timeframes = ["Today", "Week", "Month", "Quarter"];
+  
     return (
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold flex items-center gap-3">
           Manager Dashboard
           <span className="text-sm bg-orange-100 text-orange-600 px-2 py-1 rounded-full">
@@ -8,14 +15,15 @@ export default function DashboardHeader() {
           </span>
         </h1>
   
-        <div className="flex space-x-2">
-          {["Today", "Week", "Month", "Quarter"].map((label, idx) => (
+        <div className="flex gap-2">
+          {timeframes.map((label) => (
             <button
               key={label}
-              className={`px-3 py-1 rounded-full text-sm ${
-                label === "Week"
-                  ? "bg-gray-900 text-white"
-                  : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+              onClick={() => setTimeframe(label)}
+              className={`px-3 py-1.5 text-sm rounded-full border transition font-medium ${
+                timeframe === label
+                  ? "bg-black text-white"
+                  : "bg-white text-gray-800 hover:bg-gray-100"
               }`}
             >
               {label}
@@ -25,3 +33,4 @@ export default function DashboardHeader() {
       </div>
     );
   }
+  

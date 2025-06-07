@@ -27,7 +27,7 @@ export default function Sidebar() {
           >
             <span>{icon} {name}</span>
             {badge && (
-              <span className="ml-2 rounded-full bg-red-500 text-white text-xs px-2 py-0.5">
+              <span className="ml-2 rounded-full bg-red-500 text-white text-xs px-2 py-0.5" style={{ marginBottom: "30px"}}>
                 {badge}
               </span>
             )}
