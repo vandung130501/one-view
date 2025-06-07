@@ -1,4 +1,5 @@
 import type { MetaFunction } from "@remix-run/node";
+import { useEffect, useState } from "react";
 
 export const meta: MetaFunction = () => {
   return [
@@ -7,11 +8,35 @@ export const meta: MetaFunction = () => {
   ];
 };
 
+
+
 export default function Index() {
+  const [tasklists, setTasklists] = useState([]);
+  const [error, setError] = useState<string | null>(null);
+
+  async function fetchFullTasklists() {
+    const res = await fetch('/api/sync-data-list-task-support-2');
+  
+    if (!res.ok) {
+      throw new Error('Failed to fetch full tasklists');
+    }
+  
+    const data = await res.json();
+    return data;
+  }
+
+  useEffect(() => {
+    fetchFullTasklists()
+      .then((data) => setTasklists(data.tasklists))
+      .catch((err) => setError(err.message));
+  }, []);
+
+  console.log("tasklists: ", tasklists)
   return (
     <div className="flex h-screen items-center justify-center">
       <div className="flex flex-col items-center gap-16">
         <header className="flex flex-col items-center gap-9">
+          <button style={{ background: 'red', padding: "10px", border: "1px solid green"}}>Sync Data</button>
           <h1 className="leading text-2xl font-bold text-gray-800 dark:text-gray-100">
             Welcome to <span className="sr-only">Remix</span>
           </h1>
