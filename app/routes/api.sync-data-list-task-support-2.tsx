@@ -46,7 +46,7 @@ export const loader: LoaderFunction = async () => {
     do {
       const url = new URL(`${BASE_URL}/task/v2/tasklists/${tasklistId}/tasks`);
       url.searchParams.set('page_size', '50');
-      url.searchParams.set('completed', 'true');
+      // url.searchParams.set('completed', 'true');
       url.searchParams.set('user_id_type', USER_ID_TYPE);
       if (pageToken) url.searchParams.set('page_token', pageToken);
 
