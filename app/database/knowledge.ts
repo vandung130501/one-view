@@ -40,27 +40,64 @@ export async function insertSupportKnowledgeBase({
     }
 }
 
+// export async function querySupportKnowledgeBaseByAppIdAndEmbedding({
+//     app_id,
+//     embedding,
+// }: {
+//     app_id: string;
+//     embedding: number[];
+// }) {
+//     try {
+//         const query = `
+//       SELECT id, app_id, task_id, content, created_at,
+//              1 - (embedding <#> $1) AS similarity
+//       FROM knowledge
+//       WHERE app_id = $2
+//       ORDER BY embedding <#> $1 ASC
+//       LIMIT 5;
+//     `;
+//         const values = [toSql(embedding), app_id];
+//         const res = await pgClient.query(query, values);
+//         return { success: true, data: res.rows };
+//     } catch (err: unknown) {
+//         const message = err instanceof Error ? err.message : String(err);
+//         return { success: false, error: message };
+//     }
+// }
+
 export async function querySupportKnowledgeBaseByAppIdAndEmbedding({
     app_id,
     embedding,
-}: {
+    limit = 5
+  }: {
     app_id: string;
     embedding: number[];
-}) {
+    limit?: number;
+  }) {
     try {
-        const query = `
-      SELECT id, app_id, task_id, content, created_at,
-             1 - (embedding <#> $1) AS similarity
-      FROM knowledge
-      WHERE app_id = $2
-      ORDER BY embedding <#> $1 ASC
-      LIMIT 5;
-    `;
-        const values = [toSql(embedding), app_id];
-        const res = await pgClient.query(query, values);
-        return { success: true, data: res.rows };
+      const query = `
+        SELECT id, app_id, task_id, content, created_at,
+               1 - (embedding <#> $1) AS similarity
+        FROM knowledge
+        WHERE app_id = $2
+        ORDER BY embedding <#> $1 ASC
+        LIMIT $3;
+      `;
+  
+      const values = [toSql(embedding), app_id, limit];
+      const res = await pgClient.query(query, values);
+  
+      const rows = res.rows;
+      const similarities = rows.map(row => row.similarity);
+  
+      return {
+        success: true,
+        minSimilarity: Math.min(...similarities),
+        maxSimilarity: Math.max(...similarities),
+        data: rows // giữ nguyên similarity dạng float
+      };
     } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return { success: false, error: message };
+      const message = err instanceof Error ? err.message : String(err);
+      return { success: false, error: message };
     }
-}
+  }
