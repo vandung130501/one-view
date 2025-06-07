@@ -1,64 +1,17 @@
+import { useNavigate } from "@remix-run/react";
+import axios from "axios";
+import moment from "moment";
 import { useEffect, useState } from "react";
 import AppMultiSelect from "./AppMultiSelect";
 import SearchInputWithSuggestions from "./SearchInputWithSuggestions";
-import SearchPerformanceStats from "./SearchPerformanceStats";
-import { useNavigate } from "@remix-run/react";
-
-interface SearchResult {
-  id: number;
-  rank: string;
-  confidence: string;
-  type: string;
-  title: string;
-  summary: string;
-  source: string;
-  author: string;
-  date: string;
-}
-
-const mockResults: SearchResult[] = [
-  {
-    id: 1,
-    rank: "#1",
-    confidence: "HIGH MATCH",
-    type: "Product Documentation + Past Task",
-    title: "Facebook Pixel Not Tracking Conversions - Cài đặt sai domain verification",
-    summary: "Kiểm tra xem pixel đã được cài đặt đúng cách chưa và xác minh các sự kiện conversion được cấu hình chính xác trong Facebook Ads Manager. Thường thì lỗi...",
-    source: "AI Comprehensive Answer",
-    author: "John Doe",
-    date: "2024-06-01",
-  },
-  {
-    id: 2,
-    rank: "#2",
-    confidence: "MEDIUM MATCH",
-    type: "Past Support Task",
-    title: "TikTok Analytics Data Discrepancy - Báo cáo không khớp với thực tế",
-    summary:
-      "Data discrepancies usually occur due to timezone differences or delayed reporting. Wait 24-48 hours for data to reconcile. Also check if attribution w...",
-    source: "AI Comprehensive Answer",
-    author: "John Doe",
-    date: "2024-06-01",
-  },
-];
 
 export default function SearchConsole() {
   const [selectedApps, setSelectedApps] = useState<string[]>([]);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [triggeredBySelect, setTriggeredBySelect] = useState(false);
-  const [checkSearchInSelect, setCheckSearchInSelect] = useState(false);
+  const [results, setResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
   const navigate = useNavigate();
-  useEffect(() => {
-    if (triggeredBySelect) {
-      setResults(mockResults);
-      
-    } else {
-        if(query){
-            setResults([])
-        }
-    }
-  }, [triggeredBySelect, query]);
 
   useEffect(() => {
     if (query.trim() === "") {
@@ -68,30 +21,29 @@ export default function SearchConsole() {
 
   const handleSearch = async () => {
     if (!query.trim()) return;
+    setLoading(true);
     try {
-      const response = await fetch("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, apps: selectedApps }),
-      });
-      const data = await response.json();
-      setResults(data.results || []);
+      const res = await axios.post('/api/search', { keyword: query.trim() });
+      const data = await res.data;
+      
+      if(data.success){
+        setResults(data?.received?.data || []);
+      }
+      
+      // setResults(data.results || []);
     } catch (error) {
       console.error("Search API error:", error);
       setResults([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleQuery = (val: string, option: string) => {
+  const handleQuery = (val: string) => {
     setQuery(val);
-    if(option == 'text'){
-        setTriggeredBySelect(false); // trigger mock if value comes from suggestion
-    } else {
-      setTriggeredBySelect(true)
-    }
   }
 
-  const handleNavigateKnowBase = (result) => {
+  const handleNavigateKnowBase = (result: string) => {
     navigate('/knowledge-base', { state: result })
   }
 
@@ -103,57 +55,64 @@ export default function SearchConsole() {
         setQuery={handleQuery}
         onSearch={handleSearch}
       />
-      <SearchPerformanceStats />
+      {/* <SearchPerformanceStats /> */}
 
-      {results.length > 0 && (
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center py-16">
+          <div className="flex flex-col items-center gap-4">
+            <svg className="animate-spin h-8 w-8 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+          </div>
+        </div>
+      ) : results.length > 0 && (
         <div className="mt-10">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">
             Found {results.length} solutions
           </h2>
           <div className="space-y-4">
-            {results.map((result) => (
+            {results.map((result, index) => {              
+              const content = result?.content ? JSON.parse(result.content) :null
+              return(
               <div key={result.id} className="bg-white border rounded-lg shadow-sm p-4">
                 <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                  <span className="font-semibold text-indigo-600">{result.rank}</span>
+                  <span className="font-semibold text-indigo-600">#{index + 1}</span>
                   <span
                     className={`px-2 py-0.5 text-xs font-semibold rounded-full ${result.confidence === "HIGH MATCH"
                       ? "bg-green-100 text-green-700"
                       : "bg-yellow-100 text-yellow-800"
                     }`}
                   >
-                    {result.confidence}
+                    HIGH MATCH
                   </span>
                   <span>{result.type}</span>
                 </div>
                 <h3 className="text-base font-semibold text-gray-900 mb-2">
-                  {result.title}
+                  {content.issue}
                 </h3>
                 <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded mb-3">
-                  {result.summary}
+                  {content.solution}
                 </p>
                 <div className="flex items-center justify-between text-sm text-gray-500">
                   <div className="flex items-center gap-2">
                     <span className="text-purple-700 font-medium bg-purple-100 px-2 py-1 rounded-full text-xs">
-                      {result.source}
+                    AI Comprehensive Answer
                     </span>
-                    <span>👤 {result.author}</span>
-                    <span>📅 {result.date}</span>
+                    {/* <span>👤 {result.author}</span> */}
+                    <span>📅 {moment(result.created_at).format('DD/MM/YYYY')}</span>
                   </div>
                   <div className="flex gap-2">
-                    <button className="border px-3 py-1 rounded text-sm hover:bg-gray-50">📄 View Task</button>
-                    <button className="border px-3 py-1 rounded text-sm hover:bg-gray-50"
-                    onClick={() => handleNavigateKnowBase(result)}
-                    
-                    >📘 Knowledge</button>
+                    <button className="border px-3 py-1 rounded text-sm hover:bg-gray-50" onClick={() => window.open(result.task_id, '_blank')}>📄 View Task</button>
                   </div>
                 </div>
                 <div className="mt-4">
                   <p className="text-sm font-medium text-gray-700 mb-1">Related Keywords:</p>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {['Pixel installation', 'Conversion tracking', 'Domain verification', 'iOS tracking'].map((kw) => (
-                      <span key={kw} className="border border-gray-300 px-2 py-0.5 rounded-full text-xs text-gray-600">
+                    {content?.keyword?.map((kw: string) => (
+                      <button key={kw} className="border border-gray-300 px-2 py-0.5 rounded-full text-xs text-gray-600 hover:bg-gray-100" onClick={() => handleNavigateKnowBase(kw)}>  
                         {kw}
-                      </span>
+                      </button>
                     ))}
                   </div>
                   <p className="text-sm font-medium text-gray-700 mb-1">How helpful was this solution?</p>
@@ -163,6 +122,10 @@ export default function SearchConsole() {
                         key={idx}
                         className="hover:scale-110 transition-transform"
                         title={`Rating: ${emo}`}
+                        onClick={() => {
+                          setToast({ show: true, message: `Thanks your feedback` });
+                          setTimeout(() => setToast({ show: false, message: "" }), 2000);
+                        }}
                       >
                         {emo}
                       </button>
@@ -170,10 +133,29 @@ export default function SearchConsole() {
                   </div>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )}
+      {/* Toast Polaris style */}
+      {toast.show && (
+        <div className="fixed left-1/2 bottom-8 transform -translate-x-1/2 z-50">
+          <div className="bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in-up min-w-[200px] justify-center">
+            <span className="text-lg">🔔</span>
+            <span className="text-sm font-medium">{toast.message}</span>
+          </div>
+        </div>
+      )}
+      {/* Thêm animation cho toast */}
+      <style jsx global>{`
+      @keyframes fade-in-up {
+        0% { opacity: 0; transform: translateY(40px) scale(0.95); }
+        100% { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      .animate-fade-in-up {
+        animation: fade-in-up 0.3s cubic-bezier(0.4,0,0.2,1);
+      }
+      `}</style>
     </div>
   );
 }

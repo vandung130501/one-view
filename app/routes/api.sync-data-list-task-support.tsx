@@ -1,6 +1,10 @@
 // app/routes/api/tasklists.full.ts
 import { json } from '@remix-run/node';
 import type { LoaderFunction } from '@remix-run/node';
+import { task_type } from '~/utils/constants';
+
+const BASE_URL = 'https://open.larksuite.com/open-apis';
+const USER_ID_TYPE = 'open_id';
 
 export const loader: LoaderFunction = async () => {
   const token = process.env.LARK_TOKEN;
@@ -10,74 +14,107 @@ export const loader: LoaderFunction = async () => {
     return json({ error: 'LARK_TOKEN is not set' }, { status: 500 });
   }
 
-  // 1. Lấy tất cả tasklists
-  const tasklistsRes = await fetch(
-    'https://open.larksuite.com/open-apis/task/v2/tasklists?page_size=50&user_id_type=open_id',
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+  const headers = {
+    Authorization: `Bearer ${token}`,
+  };
 
-  if (!tasklistsRes.ok) {
-    return json({ error: 'Failed to fetch tasklists' }, { status: tasklistsRes.status });
+  // 1. Lấy toàn bộ tasklists bằng phân trang
+  async function fetchAllTasklists(): Promise<any[]> {
+    let tasklists: any[] = [];
+    let pageToken: string | undefined = undefined;
+
+    do {
+      const url = new URL(`${BASE_URL}/task/v2/tasklists`);
+      url.searchParams.set('page_size', '50');
+      url.searchParams.set('user_id_type', USER_ID_TYPE);
+      if (pageToken) url.searchParams.set('page_token', pageToken);
+
+      const res = await fetch(url.toString(), { headers });
+      if (!res.ok) throw new Error('Lỗi khi gọi API tasklists');
+
+      const data = await res.json();
+      tasklists = tasklists.concat(data?.data?.items || []);
+      pageToken = data?.data?.page_token;
+    } while (pageToken);
+
+    return tasklists;
   }
 
-  const tasklistsData = await tasklistsRes.json();
-  const tasklists = tasklistsData.data?.items || [];
+  // 2. Lấy tất cả task, detail, comment cho mỗi tasklist
+  async function fetchTaskDetails(tasklistId: string) {
+    const tasks: any[] = [];
+    let pageToken: string | undefined = undefined;
 
-  // 2. Với mỗi tasklist → lấy tasks + chi tiết + comments
-  const results = await Promise.all(
-    tasklists.map(async (tasklist: any) => {
-      const tasklistId = tasklist.guid;
+    // 2.1 Lặp để lấy hết tasks theo page
+    do {
+      const url = new URL(`${BASE_URL}/task/v2/tasklists/${tasklistId}/tasks`);
+      url.searchParams.set('page_size', '50');
+      url.searchParams.set('completed', 'true');
+      url.searchParams.set('user_id_type', USER_ID_TYPE);
+      if (pageToken) url.searchParams.set('page_token', pageToken);
 
-      // Lấy task trong từng tasklist
-      const taskRes = await fetch(
-        `https://open.larksuite.com/open-apis/task/v2/tasklists/${tasklistId}/tasks?completed=true&page_size=50&user_id_type=open_id`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await fetch(url.toString(), { headers });
+      if (!res.ok) break;
 
-      if (!taskRes.ok) {
-        return { tasklistId, error: 'Failed to fetch tasks' };
-      }
+      const data = await res.json();
+      tasks.push(...(data?.data?.items || []));
+      pageToken = data?.data?.page_token;
+    } while (pageToken);
 
-      const taskData = await taskRes.json();
-      const tasks = taskData.data?.items || [];
-
-      const detailedTasks = await Promise.all(
-        tasks.map(async (task: any) => {
+    // 2.2 Lấy detail và comment theo batch 2 task/lần
+    const batchSize = 2;
+    let detailedTasks: any[] = [];
+    for (let i = 0; i < tasks.length; i += batchSize) {
+      const batch = tasks.slice(i, i + batchSize);
+      const batchResults = await Promise.all(
+        batch.map(async (task) => {
           const taskId = task.guid;
 
           const [detailRes, commentRes] = await Promise.all([
-            fetch(`https://open.larksuite.com/open-apis/task/v2/tasks/${taskId}?user_id_type=open_id`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-            fetch(`https://open.larksuite.com/open-apis/task/v2/comments?direction=asc&page_size=50&resource_id=${taskId}&resource_type=task&user_id_type=open_id`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
+            fetch(`${BASE_URL}/task/v2/tasks/${taskId}?user_id_type=${USER_ID_TYPE}`, { headers }),
+            fetch(`${BASE_URL}/task/v2/comments?direction=asc&page_size=50&resource_id=${taskId}&resource_type=task&user_id_type=${USER_ID_TYPE}`, { headers }),
           ]);
 
           const detail = detailRes.ok ? await detailRes.json() : null;
           const comments = commentRes.ok ? await commentRes.json() : null;
-
+          const taskDetail = detail?.data?.task || null;
+          const listIdTaskType =taskDetail?.custom_fields?.find((field: any) => field.name === 'Task Type')?.multi_select_value || [];
+          const app_id = taskDetail?.custom_fields?.find((field: any) => field.name === 'App name')?.guid || [];
+          const taskType = task_type.find((task: any) => listIdTaskType.includes(task.id))?.key || null;
           return {
             taskId,
-            detail: detail?.data || null,
-            comments: comments?.data?.items || [],
+            app_id: app_id,
+            detail: {
+              task_url: taskDetail?.url || null,
+              description: taskDetail?.description || null, 
+              members: taskDetail?.members || null,
+              field: taskType,
+            },
+            comments: comments?.data?.items?.map((comment: any) => ({
+              content: comment?.content || null,
+              creator: comment?.creator || null,
+              created_at: comment?.created_at || null,
+            })) || [],
           };
         })
       );
-
+      detailedTasks = detailedTasks.concat(batchResults);
+      // Nghỉ 200ms giữa các batch để tránh quá tải
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    
+      return detailedTasks
+    }
+  }
+  const tasklists = await fetchAllTasklists();
+  const results = await Promise.all(
+    tasklists.map(async (tasklist) => {
+      const tasks = await fetchTaskDetails(tasklist.guid);
       return {
-        tasklistId,
+        tasklistId: tasklist.guid,
         tasklistName: tasklist.summary,
-        tasks: detailedTasks,
+        tasks,
       };
     })
   );
-
   return json({ tasklists: results });
 };
