@@ -4,16 +4,23 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+function normalizeVector(vec: number[]): number[] {
+  const norm = Math.sqrt(vec.reduce((sum, val) => sum + val * val, 0));
+  return norm === 0 ? vec : vec.map((v) => v / norm);
+}
+
 export async function getEmbedding(text: string): Promise<number[]> {
   const response = await openai.embeddings.create({
     model: "text-embedding-3-small",
     input: text,
   });
 
-  return response.data[0].embedding;
+  const raw = response.data[0].embedding;
+  const normalized = normalizeVector(raw);
+  return normalized;
 }
 
-export async function prompt(systemPrompt: string, userContent: string) {
+export async function promptOpenAI(systemPrompt: string, userContent: string) {
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",

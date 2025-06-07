@@ -55,8 +55,8 @@ export default function Index() {
   const [error, setError] = useState<string | null>(null);
 
   async function fetchFullTasklists() {
-    const res = await fetch('/api/sync-data-list-task-support-2');
-
+    const res = await fetch('/api/sync-data-list-task-support');
+  
     if (!res.ok) {
       throw new Error('Failed to fetch full tasklists');
     }
