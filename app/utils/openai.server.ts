@@ -13,7 +13,7 @@ export async function getEmbedding(text: string): Promise<number[]> {
   return response.data[0].embedding;
 }
 
-export async function prompt(systemPrompt: string, userContent: string) {
+export async function promptOpenAI(systemPrompt: string, userContent: string) {
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
