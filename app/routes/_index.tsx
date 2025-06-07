@@ -3,6 +3,7 @@ import { json } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import { testConnection, insertSupportKnowledgeBase, querySupportKnowledgeBaseByAppIdAndEmbedding } from "~/database/knowledge";
 import { useRef } from "react";
+import { useEffect, useState } from "react";
 
 export const meta: MetaFunction = () => {
   return [
@@ -47,6 +48,28 @@ export default function Index() {
   const data = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const appIdRef = useRef<HTMLInputElement>(null);
+
+  const [tasklists, setTasklists] = useState([]);
+  const [error, setError] = useState<string | null>(null);
+
+  async function fetchFullTasklists() {
+    const res = await fetch('/api/sync-data-list-task-support-2');
+  
+    if (!res.ok) {
+      throw new Error('Failed to fetch full tasklists');
+    }
+  
+    const data = await res.json();
+    return data;
+  }
+
+  useEffect(() => {
+    fetchFullTasklists()
+      .then((data) => setTasklists(data.tasklists))
+      .catch((err) => setError(err.message));
+  }, []);
+
+  console.log("tasklists: ", tasklists)
 
   return (
     <div>
